@@ -1,0 +1,136 @@
+$primary-color: #D7EB56;     
+$accent-purple: #8784F2;     
+$bg-light: #f9fafb;          
+$text-main: #1f2937;
+$text-muted: #6b7280;
+
+.aboutContainer {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif !important; 
+  color: $text-main;
+  background-color: $bg-light;
+
+  * {
+    font-family: 'Roboto', sans-serif !important;
+  }
+}
+
+.navbar {
+  background: $bg-light;
+  border-bottom: 1px solid #eaeaea;
+  width: 100%;
+}
+
+.navContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 4rem;
+
+  @media (max-width: 768px) {
+    padding: 1rem 2rem;
+  }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+
+  .logoImg {
+    width: 3.25rem;
+    height: 3.25rem;
+    object-fit: contain;
+  }
+
+  .title {
+    font-size: 1.25rem;
+    font-weight: 900;
+    
+    .naicText { color: $accent-purple; }
+    .researchText { color: #b5c742; }
+  }
+}
+
+.navLinks {
+  a {
+    text-decoration: none;
+    color: $text-muted;
+    margin-left: 2rem;
+    font-weight: 500;
+    transition: color 0.3s;
+
+    &:hover { color: $accent-purple; }
+    &.active {
+      color: $accent-purple;
+      border-bottom: 2px solid $accent-purple;
+      padding-bottom: 0.25rem;
+    }
+  }
+}
+
+.mainContent {
+  padding: 5rem 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    padding: 3rem 2rem;
+  }
+}
+
+.contentWrapper {
+  max-width: 900px;
+
+  h1 {
+    font-size: 3rem;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+
+    .highlight { 
+      color: $accent-purple; 
+    }
+  }
+
+  p {
+    color: $text-muted;
+    font-size: 1.125rem;
+    line-height: 1.6;
+    margin-bottom: 3rem;
+  }
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.featureCard {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.02);
+  border-top: 4px solid $accent-purple;
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: $text-main;
+  }
+
+  p {
+    font-size: 1rem;
+    color: $text-muted;
+    margin-bottom: 0;
+  }
+}

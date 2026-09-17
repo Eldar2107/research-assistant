@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
@@ -14,10 +15,8 @@ from src.services.ai_service import AIService
 
 logger = logging.getLogger("orchestrator")
 
-
 def _canonicalize_query(query: str) -> str:
     return (query or "").strip().lower()
-
 
 def _normalize_sources(source_spec: str | None) -> list[str]:
     if not source_spec:
@@ -44,7 +43,6 @@ def _normalize_sources(source_spec: str | None) -> list[str]:
 
     return ordered or ["wikipedia", "arxiv", "web"]
 
-
 async def _fetch_one_source(
     source_name: str,
     query: str,
@@ -60,7 +58,6 @@ async def _fetch_one_source(
         if source_name == "web":
             return await fetch_web(query, max_results=max_results, client=client)
         return []
-
 
 async def gather_sources(
     query: str,
@@ -96,45 +93,6 @@ async def gather_sources(
 
     logger.info("Total sources gathered: %d", len(combined))
     return combined
-
-
-async def fetch_sources_sequential(
-    query: str,
-    sources_to_use: str = "",
-    *,
-    max_results: int = 2,
-) -> list[Source]:
-    """Sequential source acquisition for benchmarking and fallback comparisons."""
-    canonical_query = _canonicalize_query(query)
-    combined: list[Source] = []
-    for source_name in _normalize_sources(sources_to_use):
-        try:
-            if source_name == "wikipedia":
-                fetched = await _fetch_one_source(
-                    "wikipedia",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
-            elif source_name == "arxiv":
-                fetched = await _fetch_one_source(
-                    "arxiv",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
-            else:
-                fetched = await _fetch_one_source(
-                    "web",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
-            combined.extend(fetched)
-        except Exception as exc:  # pragma: no cover - network edge case
-            logger.warning("Sequential fetch for %s failed: %s", source_name, exc)
-    return combined
-
 
 async def answer_question(query: str, sources_str: str = "", use_cache: bool = True) -> str:
     """Run the full source-fetch + synthesis pipeline."""
