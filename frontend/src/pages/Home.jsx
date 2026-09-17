@@ -12,6 +12,7 @@ const Home = () => {
     e.preventDefault();
     if (!query.trim()) return;
     setIsLoading(true);
+    setResult(null); // Əvvəlki nəticəni təmizləyirik
     
     try {
       // FastAPI backend-inə POST sorğusu
@@ -81,6 +82,16 @@ const Home = () => {
                 {isLoading ? "Axtarılır..." : "Araşdır"}
               </button>
             </form>
+
+            {/* --- NƏTİCƏNİN EKRANDA GÖRSƏNMƏSİ ÜÇÜN HİSSƏ --- */}
+            {result && (
+              <div style={{ marginTop: "20px", padding: "15px", background: "#f8f9fa", borderRadius: "8px", border: "1px solid #e5e7eb", maxWidth: "100%" }}>
+                <h3 style={{ fontSize: "1.1rem", marginBottom: "8px", color: "#1f2937" }}>Araşdırma Nəticəsi:</h3>
+                <p style={{ color: "#4b5563", whiteSpace: "pre-line", lineHeight: "1.5", fontSize: "0.95rem" }}>
+                  {result.answer}
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

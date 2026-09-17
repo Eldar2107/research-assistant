@@ -21,8 +21,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U user -d research_assistant"]
       interval: 3s
       timeout: 5s
-      retries: 12
-      start_period: 5s
+      retries: 15
+      start_period: 10s
     restart: unless-stopped
 
   app:

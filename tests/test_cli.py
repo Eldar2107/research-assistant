@@ -14,6 +14,14 @@ def setup_function():
             pass
 
 def test_cli_ask_basic():
+    # İnternetdən asılı olmaması üçün bazaya əvvəlcədən cavab yazırıq (Cache-dən oxuyacaq)
+    init_db()
+    db = SessionLocal()
+    try:
+        save_response(db, "Python nədir?", "Python nədir? sualının cavabı: Python yüksək səviyyəli proqramlaşdırma dilidir.")
+    finally:
+        db.close()
+
     result = runner.invoke(app, ["Python nədir?"])
     assert result.exit_code == 0
     assert "Python nədir?" in result.stdout

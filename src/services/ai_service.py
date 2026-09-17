@@ -64,21 +64,40 @@ class AIService:
     async def generate_response(self, prompt: str, sources: list, use_cache: bool = True):
         """
         Keşi yoxlayır, yoxdursa təhlükəsiz şəkildə ai.synthesize çağırır və nəticəni keşləyir.
+        İnternet və ya API xətası olduqda avtomatik olaraq oflayn keşə (fallback) keçir.
         """
         cache_key = f"ai_response_{hash(prompt)}"
         
+        # 1. Əgər cache aktivdirsə, əvvəlcə təzə keşə baxırıq
         if use_cache:
             cached_result = self.cache.get(cache_key)
-            if cached_result:
+            if cached_result and sources:
                 logger.info("⚡ Nəticə aktiv keşdən (JSON) uğurla gətirildi.")
                 return cached_result
 
-        # Birbaşa Gemini əvəzinə layihənin tələb etdiyi ai.synthesize funksiyasını çağırırıq
-        logger.info("🤖 Süni intellekt məlumatları sintez edir...")
-        answer = await self.execute_resilient(synthesize, prompt, sources, timeout_seconds=30)
-        
-        # Nəticəni JSON keşinə yazırıq
-        if use_cache:
-            self.cache.set(cache_key, answer)
+        try:
+            # 2. Süni intellekt məlumatları sintez etməyə çalışır
+            logger.info("🤖 Süni intellekt məlumatları sintez edir...")
+            raw_answer = await self.execute_resilient(synthesize, prompt, sources, timeout_seconds=30)
+            
+            # Obyekti JSON-a yazılabilən təmiz mətnə (string) çeviririk
+            answer = getattr(raw_answer, "answer", str(raw_answer))
 
-        return answer
+            # 3. Uğurlu nəticəni JSON keşinə yazırıq
+            if use_cache:
+                self.cache.set(cache_key, answer)
+
+            return answer
+
+        except Exception as e:
+            logger.warning(f"⚠️ İnternet və ya AI sintez xətası baş verdi: {e}. Oflayn keş yoxlanılır...")
+            
+            # 4. Fallback (Oflayn Rejim): İnternet qopduqda köhnə keşdə varsa onu qaytarırıq
+            if use_cache:
+                fallback_result = self.cache.get(cache_key)
+                if fallback_result:
+                    logger.info("🛡️ [OFLAYN REJİM] Xəta səbəbindən keşdəki son cavab təqdim olunur.")
+                    return f"[OFLAYN REJİM - Keşdən oxundu]\n{fallback_result}"
+            
+            # Əgər keşdə də yoxdursa və ya istifadə olunmursa, xətanı qaytarırıq
+            raise Exception(f"İnternet bağlantısı yoxdur və bu sorğu üçün daxili keş tapılmadı. Orijinal xəta: {e}")
