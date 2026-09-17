@@ -1,0 +1,19 @@
+{
+  "questions_file": "C:\\Users\\LENOVO\\Desktop\\research-assistant\\data\\research_questions.json",
+  "questions_count": 1,
+  "sequential": {
+    "mode": "sequential",
+    "elapsed_seconds": 1.3606,
+    "total_sources": 0,
+    "questions": 1,
+    "average_seconds_per_question": 1.3606
+  },
+  "concurrent": {
+    "mode": "concurrent",
+    "elapsed_seconds": 0.475,
+    "total_sources": 0,
+    "questions": 1,
+    "average_seconds_per_question": 0.475,
+    "failed_questions": 0
+  }
+}
