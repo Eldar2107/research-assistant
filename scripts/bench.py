@@ -1,116 +1,144 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
-import argparse
-import asyncio
-import json
 import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
+import os
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Layihənin kök qovluğunu Python axtarış yoluna əlavə edirik
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import asyncio
 
-from src.concurrency.orchestrator import fetch_sources_sequential, gather_sources
+import logging
+from typing import Any
+
+try:
+    import httpx
+except Exception:  # pragma: no cover - dependency guard
+    httpx = None
+
+from ai.schemas import Source
+from ai.sources import fetch_arxiv, fetch_web, fetch_wikipedia
+from src.config import settings
+from src.services.ai_service import AIService
+
+logger = logging.getLogger("orchestrator")
 
 
-DEFAULT_QUESTIONS_PATH = ROOT / "data" / "research_questions.json"
-DEFAULT_ARTIFACTS_DIR = ROOT / "artefacts"
+def _canonicalize_query(query: str) -> str:
+    return (query or "").strip().lower()
 
 
-def load_questions(path: Path) -> list[str]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    questions = payload.get("questions", [])
-    return [item["text"] for item in questions]
+def _normalize_sources(source_spec: str | None) -> list[str]:
+    if not source_spec:
+        return ["wikipedia", "arxiv", "web"]
 
-
-async def benchmark_sequential(questions: list[str]) -> dict:
-    started = time.perf_counter()
-    results: list[list] = []
-    for question in questions:
-        result = await fetch_sources_sequential(question, max_results=2)
-        results.append(result)
-    elapsed = time.perf_counter() - started
-    return {
-        "mode": "sequential",
-        "elapsed_seconds": round(elapsed, 4),
-        "total_sources": sum(len(items) for items in results),
-        "questions": len(questions),
-        "average_seconds_per_question": round(elapsed / len(questions), 4) if questions else 0.0,
+    lookup = {
+        "wiki": "wikipedia",
+        "wikipedia": "wikipedia",
+        "arxiv": "arxiv",
+        "paper": "arxiv",
+        "papers": "arxiv",
+        "web": "web",
+        "search": "web",
+        "internet": "web",
     }
 
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for chunk in str(source_spec).split(","):
+        name = lookup.get(chunk.strip().lower(), chunk.strip().lower())
+        if name and name not in seen:
+            ordered.append(name)
+            seen.add(name)
 
-async def benchmark_concurrent(questions: list[str]) -> dict:
-    started = time.perf_counter()
-    results = await asyncio.gather(
-        *(gather_sources(question, max_results=2) for question in questions),
-        return_exceptions=True,
-    )
-    elapsed = time.perf_counter() - started
-    valid_results = [r for r in results if not isinstance(r, Exception)]
-    return {
-        "mode": "concurrent",
-        "elapsed_seconds": round(elapsed, 4),
-        "total_sources": sum(len(items) for items in valid_results),
-        "questions": len(questions),
-        "average_seconds_per_question": round(elapsed / len(questions), 4) if questions else 0.0,
-        "failed_questions": sum(1 for r in results if isinstance(r, Exception)),
+    return ordered or ["wikipedia", "arxiv", "web"]
+
+
+async def _fetch_one_source(
+    source_name: str,
+    query: str,
+    *,
+    max_results: int = 2,
+) -> list[Source]:
+    # Hər bir mənbənin tələb etdiyi xüsusi başlıqlar (arXiv üçün atom+xml mütləqdir)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ResearchAssistant/1.0"
     }
+    if source_name == "arxiv":
+        headers["Accept"] = "application/atom+xml,application/xml"
+    elif source_name == "wikipedia":
+        headers["Accept"] = "application/json"
+
+    async with httpx.AsyncClient(
+        timeout=settings.per_source_timeout_seconds + 5,
+        follow_redirects=True,
+        headers=headers,
+    ) as client:
+        async with asyncio.timeout(settings.per_source_timeout_seconds):
+            if source_name == "wikipedia":
+                return await fetch_wikipedia(query, max_results=max_results, client=client)
+            if source_name == "arxiv":
+                return await fetch_arxiv(query, max_results=max_results, client=client)
+            if source_name == "web":
+                return await fetch_web(query, max_results=max_results, client=client)
+            return []
 
 
-def write_report(results: dict, questions_path: Path) -> Path:
-    DEFAULT_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    report_path = DEFAULT_ARTIFACTS_DIR / f"benchmark_{timestamp}.md"
-    json_path = DEFAULT_ARTIFACTS_DIR / f"benchmark_{timestamp}.json"
+async def gather_sources(
+    query: str,
+    ai_service: AIService | None = None,
+    sources_to_use: str = "",
+    *,
+    max_results: int = 2,
+) -> list[Source]:
+    """Fetch sources from Wikipedia, arXiv, and web search concurrently."""
+    canonical_query = _canonicalize_query(query)
+    allowed_sources = _normalize_sources(sources_to_use)
+    logger.info("Fetching sources for query=%r via %s", canonical_query, allowed_sources)
 
-    sequential = results["sequential"]
-    concurrent = results["concurrent"]
-    speedup = 0.0
-    if concurrent["elapsed_seconds"]:
-        speedup = sequential["elapsed_seconds"] / concurrent["elapsed_seconds"]
+    tasks = [
+        asyncio.create_task(
+            _fetch_one_source(name, canonical_query, max_results=max_results)
+        )
+        for name in allowed_sources
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    markdown = f"""# Research Assistant Benchmark Report
+    combined: list[Source] = []
+    for item in results:
+        if isinstance(item, Exception):
+            logger.warning("One source failed and was skipped: %s", item)
+            continue
+        if item:
+            combined.extend(item)
 
-- Generated: {datetime.now(timezone.utc).isoformat()}
-- Questions source: {questions_path}
-
-| Mode | Questions | Total sources | Elapsed (s) | Avg / question (s) | Failed |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Sequential | {sequential['questions']} | {sequential['total_sources']} | {sequential['elapsed_seconds']:.4f} | {sequential['average_seconds_per_question']:.4f} | 0 |
-| Concurrent | {concurrent['questions']} | {concurrent['total_sources']} | {concurrent['elapsed_seconds']:.4f} | {concurrent['average_seconds_per_question']:.4f} | {concurrent['failed_questions']} |
-
-## Summary
-
-- Speedup: {speedup:.2f}x faster in the concurrent mode.
-- The concurrent pathway runs all source fetches in parallel using the async orchestrator and tolerates individual failures with graceful degradation.
-"""
-
-    report_path.write_text(markdown, encoding="utf-8")
-    json_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
-    return report_path
-
-
-async def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare sequential vs concurrent research source fetching.")
-    parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS_PATH, help="Path to the JSON file containing research questions.")
-    parser.add_argument("--max-questions", type=int, default=None, help="Optional limit for a quicker benchmark run.")
-    args = parser.parse_args()
-
-    questions = load_questions(args.questions)
-    if args.max_questions is not None:
-        questions = questions[: args.max_questions]
-
-    sequential = await benchmark_sequential(questions)
-    concurrent = await benchmark_concurrent(questions)
-
-    report = {"questions_file": str(args.questions), "questions_count": len(questions), "sequential": sequential, "concurrent": concurrent}
-    output_path = write_report(report, args.questions)
-    print(f"Benchmark complete: {output_path}")
-    print(json.dumps(report, indent=2, ensure_ascii=False))
+    logger.info("Total sources gathered: %d", len(combined))
+    return combined
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+async def fetch_sources_sequential(
+    query: str,
+    sources_to_use: str = "",
+    *,
+    max_results: int = 2,
+) -> list[Source]:
+    """Sequential source acquisition for benchmarking and fallback comparisons."""
+    canonical_query = _canonicalize_query(query)
+    combined: list[Source] = []
+    for source_name in _normalize_sources(sources_to_use):
+        try:
+            fetched = await _fetch_one_source(source_name, canonical_query, max_results=max_results)
+            combined.extend(fetched)
+        except Exception as exc:  # pragma: no cover - network edge case
+            logger.warning("Sequential fetch for %s failed: %s", source_name, exc)
+    return combined
+
+
+async def answer_question(query: str, sources_str: str = "", use_cache: bool = True) -> str:
+    """Run the full source-fetch + synthesis pipeline."""
+    canonical_query = _canonicalize_query(query)
+    ai_service = AIService()
+    sources = await gather_sources(canonical_query, ai_service, sources_str)
+
+    if not sources:
+        return "No sources were found for this question."
+
+    answer = await ai_service.generate_response(canonical_query, sources, use_cache=use_cache)
+    return answer

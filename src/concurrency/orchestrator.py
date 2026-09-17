@@ -49,17 +49,32 @@ async def _fetch_one_source(
     source_name: str,
     query: str,
     *,
-    client: httpx.AsyncClient,
     max_results: int = 2,
 ) -> list[Source]:
-    async with asyncio.timeout(settings.per_source_timeout_seconds):
-        if source_name == "wikipedia":
-            return await fetch_wikipedia(query, max_results=max_results, client=client)
-        if source_name == "arxiv":
-            return await fetch_arxiv(query, max_results=max_results, client=client)
-        if source_name == "web":
-            return await fetch_web(query, max_results=max_results, client=client)
-        return []
+    # Hər mənbənin özünəməxsus başlıqlarını təyin edirik ki, 406 xətası alınmasın
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ResearchAssistant/1.0"
+    }
+    if source_name == "arxiv":
+        headers["Accept"] = "application/atom+xml,application/xml"
+    elif source_name == "wikipedia":
+        headers["Accept"] = "application/json"
+    else:
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+    async with httpx.AsyncClient(
+        timeout=settings.per_source_timeout_seconds + 5,
+        follow_redirects=True,
+        headers=headers,
+    ) as client:
+        async with asyncio.timeout(settings.per_source_timeout_seconds):
+            if source_name == "wikipedia":
+                return await fetch_wikipedia(query, max_results=max_results, client=client)
+            if source_name == "arxiv":
+                return await fetch_arxiv(query, max_results=max_results, client=client)
+            if source_name == "web":
+                return await fetch_web(query, max_results=max_results, client=client)
+            return []
 
 
 async def gather_sources(
@@ -74,17 +89,13 @@ async def gather_sources(
     allowed_sources = _normalize_sources(sources_to_use)
     logger.info("Fetching sources for query=%r via %s", canonical_query, allowed_sources)
 
-    async with httpx.AsyncClient(
-        timeout=settings.per_source_timeout_seconds + 5,
-        follow_redirects=True,
-    ) as client:
-        tasks = [
-            asyncio.create_task(
-                _fetch_one_source(name, canonical_query, client=client, max_results=max_results)
-            )
-            for name in allowed_sources
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+    tasks = [
+        asyncio.create_task(
+            _fetch_one_source(name, canonical_query, max_results=max_results)
+        )
+        for name in allowed_sources
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
     combined: list[Source] = []
     for item in results:
@@ -109,27 +120,7 @@ async def fetch_sources_sequential(
     combined: list[Source] = []
     for source_name in _normalize_sources(sources_to_use):
         try:
-            if source_name == "wikipedia":
-                fetched = await _fetch_one_source(
-                    "wikipedia",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
-            elif source_name == "arxiv":
-                fetched = await _fetch_one_source(
-                    "arxiv",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
-            else:
-                fetched = await _fetch_one_source(
-                    "web",
-                    canonical_query,
-                    client=httpx.AsyncClient(timeout=settings.per_source_timeout_seconds + 5),
-                    max_results=max_results,
-                )
+            fetched = await _fetch_one_source(source_name, canonical_query, max_results=max_results)
             combined.extend(fetched)
         except Exception as exc:  # pragma: no cover - network edge case
             logger.warning("Sequential fetch for %s failed: %s", source_name, exc)
