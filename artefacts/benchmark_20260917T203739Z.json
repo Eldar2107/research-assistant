@@ -1,0 +1,19 @@
+{
+  "questions_file": "/app/data/research_questions.json",
+  "questions_count": 5,
+  "sequential": {
+    "mode": "sequential",
+    "elapsed_seconds": 8.3035,
+    "total_sources": 0,
+    "questions": 5,
+    "average_seconds_per_question": 1.6607
+  },
+  "concurrent": {
+    "mode": "concurrent",
+    "elapsed_seconds": 0.7085,
+    "total_sources": 0,
+    "questions": 5,
+    "average_seconds_per_question": 0.1417,
+    "failed_questions": 0
+  }
+}
