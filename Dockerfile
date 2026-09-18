@@ -1,5 +1,5 @@
-# 1. Node.js vasitəsilə frontend-i build edirik
-FROM node:18-slim AS frontend-build
+# 1. Node.js versiyasını 20-yə qaldırırıq ki, styleText dəstəklənsin
+FROM node:20-slim AS frontend-build
 WORKDIR /frontend-app
 COPY frontend/package*.json ./
 RUN npm install
