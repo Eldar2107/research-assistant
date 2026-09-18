@@ -5,18 +5,18 @@ import styles from './Home.module.scss';
 const Home = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState(null); // Backend-dən gələn cavab üçün
+  const [result, setResult] = useState(null);
   const navigate = useNavigate();
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
     setIsLoading(true);
-    setResult(null); // Əvvəlki nəticəni təmizləyirik
+    setResult(null);
     
     try {
-      // FastAPI backend-inə POST sorğusu
-      const response = await fetch('http://localhost:8000/api/search', {
+      // Buranı düzəltdik: localhost əvəzinə nisbi URL istifadə edirik
+      const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ const Home = () => {
               </button>
             </form>
 
-            {/* --- NƏTİCƏNİN EKRANDA GÖRSƏNMƏSİ ÜÇÜN HİSSƏ --- */}
+            {/* NƏTİCƏNİN EKRANDA GÖRSƏNMƏSİ */}
             {result && (
               <div style={{ marginTop: "20px", padding: "15px", background: "#f8f9fa", borderRadius: "8px", border: "1px solid #e5e7eb", maxWidth: "100%" }}>
                 <h3 style={{ fontSize: "1.1rem", marginBottom: "8px", color: "#1f2937" }}>Araşdırma Nəticəsi:</h3>

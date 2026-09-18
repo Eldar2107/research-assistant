@@ -1,7 +1,7 @@
 $primary-color: #D7EB56;     
 $primary-hover: #c4d64c;     
 $accent-purple: #8784F2;     
-$bg-light: #f9fafb;          
+$bg-light: #f9fafb;         
 $text-main: #1f2937;
 $text-muted: #6b7280;
 
@@ -32,8 +32,12 @@ $text-muted: #6b7280;
   margin: 0 auto;
   padding: 1.25rem 4rem;
 
+  @media (max-width: 1024px) {
+    padding: 1.25rem 2rem;
+  }
+
   @media (max-width: 768px) {
-    padding: 1rem 2rem;
+    padding: 1rem 1.25rem;
   }
 }
 
@@ -45,15 +49,24 @@ $text-muted: #6b7280;
   user-select: none;
 
   .logoImg {
-    width: 3.25rem;
-    height: 3.25rem;
+    width: 3rem;
+    height: 3rem;
     object-fit: contain;
+
+    @media (max-width: 768px) {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
   }
 
   .title {
     font-size: 1.25rem;
     font-weight: 900;
     
+    @media (max-width: 768px) {
+      font-size: 1.1rem;
+    }
+
     .naicText { color: $accent-purple; }
     .researchText { color: #b5c742; }
   }
@@ -66,6 +79,11 @@ $text-muted: #6b7280;
     margin-left: 2rem;
     font-weight: 500;
     transition: color 0.3s;
+
+    @media (max-width: 768px) {
+      margin-left: 1rem;
+      font-size: 0.95rem;
+    }
 
     &:hover { color: $accent-purple; }
     &.active {
@@ -80,22 +98,29 @@ $text-muted: #6b7280;
   display: flex;
   flex-grow: 1;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     flex-direction: column;
   }
 }
 
 .searchSection {
   flex: 0 0 60%;
-  padding: 4rem 4rem;
+  padding: 4rem;
   background-color: $bg-light; 
   display: flex;
   flex-direction: column;
   justify-content: center;
 
-  @media (max-width: 768px) {
-    flex: 1;
+  @media (max-width: 1024px) {
     padding: 3rem 2rem;
+    flex: 0 0 55%;
+  }
+
+  @media (max-width: 900px) {
+    flex: 1;
+    padding: 3rem 1.5rem;
+    text-align: center;
+    align-items: center;
   }
 }
 
@@ -110,6 +135,14 @@ $text-muted: #6b7280;
     line-height: 1.2;
     margin-bottom: 1rem;
 
+    @media (max-width: 1200px) {
+      font-size: 2.5rem;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 2rem;
+    }
+
     .highlight { 
       color: $accent-purple; 
     }
@@ -120,6 +153,11 @@ $text-muted: #6b7280;
     font-size: 1.125rem;
     margin-bottom: 2.5rem;
     font-weight: 400;
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+    }
   }
 }
 
@@ -131,8 +169,22 @@ $text-muted: #6b7280;
   box-shadow: 0 10px 25px rgba(0,0,0,0.03);
   border: 2px solid transparent;
   transition: border-color 0.3s;
+  width: 100%;
 
-  &:focus-within { border-color: $primary-color; }
+  @media (max-width: 550px) {
+    flex-direction: column;
+    background: transparent;
+    box-shadow: none;
+    gap: 0.75rem;
+    border: none;
+  }
+
+  &:focus-within { 
+    border-color: $primary-color; 
+    @media (max-width: 550px) {
+      border-color: transparent;
+    }
+  }
 
   input {
     flex-grow: 1;
@@ -141,6 +193,19 @@ $text-muted: #6b7280;
     outline: none;
     font-size: 1.125rem;
     background: transparent;
+
+    @media (max-width: 550px) {
+      background: white;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: 2px solid #eaeaea;
+      width: 100%;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+      padding: 1rem;
+    }
   }
 
   button {
@@ -152,6 +217,17 @@ $text-muted: #6b7280;
     font-weight: 700;
     cursor: pointer;
     transition: background-color 0.3s;
+
+    @media (max-width: 550px) {
+      padding: 1rem;
+      border-radius: 0.75rem;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+    }
 
     &:hover { background-color: $primary-hover; }
     &:disabled { opacity: 0.7; cursor: not-allowed; }
@@ -167,8 +243,12 @@ $text-muted: #6b7280;
   position: relative;
   overflow: hidden;
 
-  @media (max-width: 768px) {
-    display: none;
+  @media (max-width: 1024px) {
+    flex: 0 0 45%;
+  }
+
+  @media (max-width: 900px) {
+    display: none; // Telefonda robot şəkli gizlənir ki, yer tutmasın
   }
 }
 
@@ -179,6 +259,11 @@ $text-muted: #6b7280;
   background: rgba(135, 132, 242, 0.12); 
   border-radius: 50%;
   filter: blur(50px);
+
+  @media (max-width: 1200px) {
+    width: 300px;
+    height: 300px;
+  }
 }
 
 .robotImg {
@@ -186,6 +271,10 @@ $text-muted: #6b7280;
   z-index: 10;
   max-width: 80%;
   transition: transform 0.7s;
+
+  @media (max-width: 1200px) {
+    max-width: 70%;
+  }
 
   &:hover { transform: translateY(-1rem); }
 }

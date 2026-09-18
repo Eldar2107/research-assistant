@@ -1,6 +1,6 @@
 $primary-color: #D7EB56;     
 $accent-purple: #8784F2;     
-$bg-light: #f9fafb;          
+$bg-light: #f9fafb;         
 $text-main: #1f2937;
 $text-muted: #6b7280;
 
@@ -31,8 +31,12 @@ $text-muted: #6b7280;
   margin: 0 auto;
   padding: 1.25rem 4rem;
 
+  @media (max-width: 1024px) {
+    padding: 1.25rem 2rem;
+  }
+
   @media (max-width: 768px) {
-    padding: 1rem 2rem;
+    padding: 1rem 1.25rem;
   }
 }
 
@@ -47,12 +51,21 @@ $text-muted: #6b7280;
     width: 3.25rem;
     height: 3.25rem;
     object-fit: contain;
+
+    @media (max-width: 768px) {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
   }
 
   .title {
     font-size: 1.25rem;
     font-weight: 900;
     
+    @media (max-width: 768px) {
+      font-size: 1.1rem;
+    }
+
     .naicText { color: $accent-purple; }
     .researchText { color: #b5c742; }
   }
@@ -65,6 +78,11 @@ $text-muted: #6b7280;
     margin-left: 2rem;
     font-weight: 500;
     transition: color 0.3s;
+
+    @media (max-width: 768px) {
+      margin-left: 1rem;
+      font-size: 0.95rem;
+    }
 
     &:hover { color: $accent-purple; }
     &.active {
@@ -81,8 +99,12 @@ $text-muted: #6b7280;
   margin: 0 auto;
   width: 100%;
 
+  @media (max-width: 1024px) {
+    padding: 4rem 2rem;
+  }
+
   @media (max-width: 768px) {
-    padding: 3rem 2rem;
+    padding: 2.5rem 1.25rem;
   }
 }
 
@@ -95,6 +117,15 @@ $text-muted: #6b7280;
     line-height: 1.2;
     margin-bottom: 1.5rem;
 
+    @media (max-width: 1024px) {
+      font-size: 2.5rem;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
     .highlight { 
       color: $accent-purple; 
     }
@@ -105,6 +136,11 @@ $text-muted: #6b7280;
     font-size: 1.125rem;
     line-height: 1.6;
     margin-bottom: 3rem;
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+      margin-bottom: 2rem;
+    }
   }
 }
 
@@ -112,6 +148,10 @@ $text-muted: #6b7280;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
+
+  @media (max-width: 768px) {
+    gap: 1.25rem;
+  }
 }
 
 .featureCard {
@@ -121,16 +161,28 @@ $text-muted: #6b7280;
   box-shadow: 0 10px 25px rgba(0,0,0,0.02);
   border-top: 4px solid $accent-purple;
 
+  @media (max-width: 768px) {
+    padding: 1.5rem;
+  }
+
   h3 {
     font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.75rem;
     color: $text-main;
+
+    @media (max-width: 768px) {
+      font-size: 1.15rem;
+    }
   }
 
   p {
     font-size: 1rem;
     color: $text-muted;
     margin-bottom: 0;
+
+    @media (max-width: 768px) {
+      font-size: 0.95rem;
+    }
   }
 }
