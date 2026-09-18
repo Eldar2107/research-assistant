@@ -4,6 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from src.concurrency.orchestrator import answer_question
 
+import mimetypes
+
+# .jsx uzantısını düzgün JavaScript MIME tipi kimi tanıdılaq
+mimetypes.add_type("application/javascript", ".jsx")
+mimetypes.add_type("text/javascript", ".js")
 app = FastAPI(title="Research Assistant API")
 
 # CORS ayarları
