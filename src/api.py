@@ -57,4 +57,4 @@ async def ask_endpoint(request: AskRequest):
 
 # Frontend interfeysini birbaşa əsas səhifəyə (/) bağlayırıq
 # (Diqqət: Bütün API endpoint-ləri işləməsi üçün bu mount həmişə ən sonda olmalıdır)
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
