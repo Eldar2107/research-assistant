@@ -6,9 +6,10 @@ from src.concurrency.orchestrator import answer_question
 
 import mimetypes
 
-# .jsx uzantısını düzgün JavaScript MIME tipi kimi tanıdılaq
+# .jsx uzantısını düzgün JavaScript MIME tipi kimi tanıdırıq
 mimetypes.add_type("application/javascript", ".jsx")
 mimetypes.add_type("text/javascript", ".js")
+
 app = FastAPI(title="Research Assistant API")
 
 # CORS ayarları
@@ -55,5 +56,5 @@ async def ask_endpoint(request: AskRequest):
     return {"query": request.query, "answer": answer}
 
 # Frontend interfeysini birbaşa əsas səhifəyə (/) bağlayırıq
-# (Diqqət: API endpoint-ləri işləməsi üçün bu mount həmişə ən sonda olmalıdır)
+# (Diqqət: Bütün API endpoint-ləri işləməsi üçün bu mount həmişə ən sonda olmalıdır)
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
