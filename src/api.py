@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from src.concurrency.orchestrator import answer_question
 
@@ -20,10 +21,6 @@ class SearchRequest(BaseModel):
 class AskRequest(BaseModel):
     query: str
     sources: str = "wikipedia,arxiv,web"
-
-@app.get("/")
-def read_root():
-    return {"status": "ok", "message": "Research Assistant API is running"}
 
 @app.get("/health")
 def health_check():
@@ -51,3 +48,7 @@ async def ask_endpoint(request: AskRequest):
     """Run the research assistant pipeline for a given query."""
     answer = await answer_question(query=request.query, sources_str=request.sources)
     return {"query": request.query, "answer": answer}
+
+# Frontend interfeysini birbaşa əsas səhifəyə (/) bağlayırıq
+# (Diqqət: API endpoint-ləri işləməsi üçün bu mount həmişə ən sonda olmalıdır)
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
