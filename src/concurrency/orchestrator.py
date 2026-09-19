@@ -121,14 +121,21 @@ async def fetch_sources_sequential(
             logger.warning("Sequential fetch for %s failed: %s", source_name, exc)
     return combined
 
-async def answer_question(query: str, sources_str: str = "", use_cache: bool = True) -> str:
-    """Run the full source-fetch + synthesis pipeline."""
+async def answer_question(query: str, sources_str: str = "", use_cache: bool = True) -> dict[str, Any]:
+    """Run the full source-fetch + synthesis pipeline and return answer with sources."""
     canonical_query = _canonicalize_query(query)
     ai_service = AIService()
     sources = await gather_sources(canonical_query, ai_service, sources_str)
 
     if not sources:
-        return "No sources were found for this question."
+        return {
+            "answer": "No sources were found for this question.",
+            "sources": []
+        }
 
     answer = await ai_service.generate_response(canonical_query, sources, use_cache=use_cache)
-    return answer
+    
+    return {
+        "answer": answer,
+        "sources": sources
+    }

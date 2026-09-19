@@ -15,7 +15,6 @@ const Home = () => {
     setResult(null);
     
     try {
-      // Buranı düzəltdik: localhost əvəzinə nisbi URL istifadə edirik
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
@@ -83,13 +82,34 @@ const Home = () => {
               </button>
             </form>
 
-            {/* NƏTİCƏNİN EKRANDA GÖRSƏNMƏSİ */}
+            {/* NƏTİCƏNİN VƏ MƏNBƏLƏRİN EKRANDA GÖRSƏNMƏSİ */}
             {result && (
               <div style={{ marginTop: "20px", padding: "15px", background: "#f8f9fa", borderRadius: "8px", border: "1px solid #e5e7eb", maxWidth: "100%" }}>
                 <h3 style={{ fontSize: "1.1rem", marginBottom: "8px", color: "#1f2937" }}>Araşdırma Nəticəsi:</h3>
                 <p style={{ color: "#4b5563", whiteSpace: "pre-line", lineHeight: "1.5", fontSize: "0.95rem" }}>
                   {result.answer}
                 </p>
+
+                {/* Mənbələr (References) Siyahısı */}
+                {result.sources && result.sources.length > 0 && (
+                  <div style={{ marginTop: "15px", borderTop: "1px solid #e5e7eb", paddingTop: "10px" }}>
+                    <h4 style={{ fontSize: "0.95rem", marginBottom: "6px", color: "#1f2937" }}>📚 İstifadə olunan mənbələr:</h4>
+                    <ul style={{ paddingLeft: "18px", margin: 0 }}>
+                      {result.sources.map((src, index) => (
+                        <li key={index} style={{ marginBottom: "4px", fontSize: "0.85rem" }}>
+                          <a 
+                            href={src.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ color: "#2563eb", textDecoration: "none" }}
+                          >
+                            {src.title || src.url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -32,15 +32,19 @@ class AskRequest(BaseModel):
 def health_check():
     return {"status": "healthy"}
 
-# Frontend üçün search endpointi
+# Frontend üçün search endpointi (artıq mənbələri də qaytarır)
 @app.post("/api/search")
 async def search_endpoint(request: SearchRequest):
     try:
-        result_answer = await answer_question(request.query)
+        result = await answer_question(request.query)
+        answer_text = result.get("answer", "") if isinstance(result, dict) else str(result)
+        sources_list = result.get("sources", []) if isinstance(result, dict) else []
+        
         return {
             "status": "success",
             "query": request.query,
-            "answer": result_answer
+            "answer": answer_text,
+            "sources": sources_list
         }
     except Exception as e:
         return {
@@ -48,12 +52,19 @@ async def search_endpoint(request: SearchRequest):
             "message": str(e)
         }
 
-# Komanda yoldaşının əlavə etdiyi ask endpointi
+# Komanda yoldaşının əlavə etdiyi ask endpointi (artıq mənbələri də qaytarır)
 @app.post("/ask")
 async def ask_endpoint(request: AskRequest):
     """Run the research assistant pipeline for a given query."""
-    answer = await answer_question(query=request.query, sources_str=request.sources)
-    return {"query": request.query, "answer": answer}
+    result = await answer_question(query=request.query, sources_str=request.sources)
+    answer_text = result.get("answer", "") if isinstance(result, dict) else str(result)
+    sources_list = result.get("sources", []) if isinstance(result, dict) else []
+    
+    return {
+        "query": request.query,
+        "answer": answer_text,
+        "sources": sources_list
+    }
 
 # Frontend interfeysini birbaşa əsas səhifəyə (/) bağlayırıq
 # (Diqqət: Bütün API endpoint-ləri işləməsi üçün bu mount həmişə ən sonda olmalıdır)
