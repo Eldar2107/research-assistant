@@ -1,0 +1,432 @@
+% ---------------------------------------------------------------
+% AI-ENG-110 - Final Project Report - Topic 4
+% Compile with: pdflatex final_report.tex  (run twice for the ToC)
+% ---------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- header / footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small AI-ENG-110 -- Final Report -- Topic 4}
+\fancyhead[R]{\small Spring 2026}
+\fancyfoot[L]{\small AI Academy, National AI Center}
+\fancyfoot[R]{\small Page \thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\usepackage{lastpage}
+
+% ---------- code listings ----------
+\definecolor{codebg}{gray}{0.96}
+\definecolor{codecomment}{rgb}{0.30,0.45,0.30}
+\definecolor{codekey}{rgb}{0.15,0.20,0.60}
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  commentstyle=\color{codecomment}\itshape,
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{gray!40},
+  showstringspaces=false,
+  columns=fullflexible,
+  captionpos=b,
+  literate={-}{-}1 {_}{\_}1
+}
+\lstdefinestyle{shell}{language=bash}
+\lstdefinestyle{py}{language=Python}
+\lstdefinestyle{plain}{language=}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% ---------- title block ----------
+\title{\vspace{-1.5cm}
+  \Large AI Academy, National AI Center\\[2pt]
+  \large AI-ENG-110 -- Software Engineering -- Spring 2026\\[10pt]
+  \textbf{\LARGE Final Project Report}\\[6pt]
+  \textbf{\large Topic 4 -- Async Research Assistant}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+\vspace{-1.8cm}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\textbf{Team:} & M501 Group 2 \\
+\textbf{Date:} & \today \\
+\textbf{Repo:} & \url{https://github.com/Eldar2107/research-assistant} \\
+\textbf{Members:} & Ulvi Ismayilzada, Eldar Samadov, Rashad Atayi \\
+\end{tabular}
+\end{center}
+
+\vspace{0.6cm}
+
+% ===============================================================
+\section*{Executive Summary}
+\addcontentsline{toc}{section}{Executive Summary}
+
+We built a research assistant that takes a plain-language question, queries
+Wikipedia, arXiv and web search \emph{at the same time}, and returns one short
+answer with numbered \code{[N]} citations. The concurrent path
+(\code{gather\_sources}) costs roughly the slowest single source, while the
+sequential baseline (\code{fetch\_sources\_sequential}) costs roughly the sum of
+all three; both implementations live side by side in
+\code{src/concurrency/orchestrator.py} so the comparison is apples to apples.
+The measured performance metrics confirm a significant reduction in latency via asynchronous execution (\S\ref{sec:bench}).
+
+Around that core we built a full delivery surface rather than a CLI alone: a
+FastAPI service with a built web page, a CLI, a PostgreSQL history store with a
+SQLite fallback, a file cache with TTL, and a Docker Compose stack that includes
+an \emph{offline demo profile} which runs with no keys and no network. The
+provided \code{ai/} package is used exactly as distributed; only
+\code{services/AIService} crosses that boundary, which is what makes the LLM
+provider a one-line change in \code{.env}.
+
+% ===============================================================
+\tableofcontents
+\newpage
+
+% ===============================================================
+\section{Project Overview}
+
+\subsection{Problem framing \& scope}
+A user asks a research question in plain language, for example \emph{``What is
+photosynthesis and what are its main stages?''} The system queries three public
+sources concurrently --- Wikipedia for encyclopedic summaries, arXiv for papers,
+and a web search provider for everything else --- and then asks a language model
+to write one short answer that cites the retrieved excerpts by number. The input
+is a single string; the output is the answer text with \code{[N]} markers,
+rendered in the terminal, as JSON from the API, or in the web page.
+
+Scope is deliberately wider than the minimum brief in one direction and narrower
+in another. Wider: we shipped an HTTP API and a web front end on top of the CLI,
+plus a persistent query history in PostgreSQL. Narrower: we did not build
+provider failover, authentication or rate limiting, and the reference list
+(title and link) is not yet returned alongside the answer --- see
+\S\ref{sec:limits}.
+
+\subsection{Provider choice and the AI module contract}
+The synthesis backend is selected by \code{LLM\_PROVIDER} and can be
+\code{anthropic}, \code{openai} or \code{gemini}; the default is \code{gemini}
+with \code{gemini-2.5-flash}, because the model id lives in \code{.env} and can
+change without touching code. Web search is selected by
+\code{WEB\_SEARCH\_PROVIDER} and can be \code{tavily} (default), \code{serper}
+or \code{duckduckgo}; DuckDuckGo needs no key, which is what keeps a keyless run
+possible. Wikipedia and arXiv need no keys at all.
+
+The provided \code{ai/} package comes from the course and is used as is --- we
+did not modify its public interface. Only \code{services/AIService} calls
+\code{ai/synthesize}, so swapping one LLM vendor for another touches exactly one
+module plus the environment file.
+
+% ===============================================================
+\section{Architecture}
+
+\subsection{Module map}
+\begin{lstlisting}[style=plain,caption={Repository layout}]
+.
+|-- ai/
+|   |-- providers/
+|   |-- sources.py
+|   |-- synthesizer.py
+|   `-- schemas.py
+|-- src/
+|   |-- config.py
+|   |-- cli.py
+|   |-- api.py
+|   |-- concurrency/
+|   |-- services/
+|   `-- storage/
+|-- frontend/
+|-- scripts/
+|-- tests/
+|-- data/research_questions.json
+|-- artefacts/
+|-- docker/
+|-- Dockerfile
+|-- docker-compose.yml
+|-- requirements.txt
+|-- .env.example
+`-- README.md
+\end{lstlisting}
+
+Module by module: \code{src/config.py} reads the environment into a settings
+object shared by every module; \code{src/cli.py} parses arguments and renders
+answers; \code{src/api.py} exposes the HTTP endpoints and serves the built front
+end; \code{src/concurrency/} holds both the sequential and the concurrent
+orchestrators; \code{src/services/} holds \code{AIService} and
+\code{CacheManager}; \code{src/storage/} holds the repository backed by
+PostgreSQL or SQLite; \code{frontend/} is the web page; \code{scripts/} holds
+the benchmark harness; \code{data/research\_questions.json} holds the benchmark
+questions and \code{artefacts/} receives the reports.
+
+\subsection{Data flow across module boundaries}
+\begin{lstlisting}[style=plain,caption={How it fits together}]
+CLI / API -> concurrency/gather_sources -+-> Wikipedia
+                                         +-> arXiv
+                                         +-> Web search
+          -> services/AIService -+-> services/CacheManager (JSON files, TTL)
+                                 +-> ai/synthesize (LLM, retry + timeout)
+CLI -> storage/repository (PostgreSQL or SQLite history)
+\end{lstlisting}
+
+Two boundaries carry the design. The first is \code{AIService}, the single
+caller of \code{synthesize}; the second is the storage repository, which hides
+whether history lives in PostgreSQL or SQLite behind one interface. Degradation
+is defined at both: if a source fails or times out it is skipped and the answer
+is built from the remaining sources, and if the LLM call fails while an older
+cached answer exists, that answer is returned with an offline note rather than
+an error.
+
+% ===============================================================
+\section{Concurrency \& Performance}
+
+\subsection{Why this concurrency model}
+The workload is three independent network calls per question, so the bottleneck
+is waiting on providers --- exactly what async I/O parallelizes best. Threads
+would add complexity for no gain against HTTP waits and processes would be
+absurd. \code{gather\_sources} issues the three fetches together with a
+per-source timeout (\code{PER\_SOURCE\_TIMEOUT\_SECONDS}, default 10~s), so one
+slow provider bounds its own cost instead of the whole request.
+
+\subsection{Sequential-vs-concurrent benchmark}
+\label{sec:bench}
+The comparison runs \code{fetch\_sources\_sequential} (about the sum of the three
+sources) against \code{gather\_sources} (about the slowest one), both from
+\code{src/concurrency/orchestrator.py}, over the questions in
+\code{data/research\_questions.json}; reports are written to \code{artefacts/}.
+
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Workload} & \textbf{N} & \textbf{Sequential (s)} & \textbf{Concurrent (s)} & \textbf{Speedup} \\
+\midrule
+5 questions $\times$ 3 sources & 15 fetches & 4.52 & 2.73 & 1.66$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Measurement environment: Windows, Python 3.13.3, cleared cache (--offline mode).
+
+% ===============================================================
+\section{Robustness \& Error Handling}
+
+\subsection{Wrapping the AI module}
+Every call into the provided package passes through \code{AIService}, which adds
+a retry with timeout around synthesis and a per-source timeout around each
+fetch. Nothing else in the codebase imports \code{synthesize} directly, so the
+retry, timeout and logging policy cannot be bypassed by accident.
+
+\subsection{Degradation paths}
+Three failure paths are handled explicitly rather than allowed to crash a
+request:
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{A source fails or times out.} It is dropped and the answer is
+        synthesized from whatever returned.
+  \item \textbf{The LLM call fails.} If an older cached answer exists for the
+        question, it is returned with an offline note.
+  \item \textbf{A repeated question.} It is served from the database history
+        with a \code{[CACHE]} prefix, which makes cache behavior visible to the
+        user rather than silent.
+\end{itemize}
+
+\subsection{Input validation}
+The CLI accepts a question string plus \code{--sources} (any subset of
+\code{wiki}, \code{arxiv}, \code{web}) and \code{--no-cache}; unknown source
+names are rejected before any network call. The API mirrors the same choice
+through the \code{sources} field on \code{/ask}.
+
+% ===============================================================
+\section{Storage \& Caching}
+
+\subsection{History store}
+Query history is persisted through \code{src/storage/repository}, against the
+PostgreSQL container in Docker or against SQLite locally. Running outside Docker
+therefore needs \code{DATABASE\_URL=sqlite:///./research\_assistant.db} in
+\code{.env}, since the default value points at the \code{research-postgres} host
+that only exists on the Compose network. Tables are created with
+\code{create\_all}.
+
+\subsection{Caching policy}
+There are two caches. \code{services/CacheManager} stores synthesized answers as
+JSON files under \code{CACHE\_DIR} (default \code{./.cache}) with a TTL from
+\code{CACHE\_TTL\_SECONDS} (default 24~h). Separately, the history table serves
+repeated questions with a \code{[CACHE]} prefix. They do not currently share
+keys, which is recorded as a limitation rather than presented as a design.
+
+% ===============================================================
+\section{Testing}
+
+\begin{lstlisting}[style=shell,caption={Full suite with coverage, then the AI smoke tests}]
+docker compose run --rm -e PYTHONPATH=/app app pytest --cov=src --cov-report=term-missing
+docker compose run --rm -e PYTHONPATH=/app app pytest tests/test_ai_smoke.py -v
+\end{lstlisting}
+
+The whole suite runs offline. The AI smoke tests use a fake LLM and a fake web
+search provider, so no key and no network are needed; storage tests run against
+an in-memory SQLite database. The one environment requirement is that
+\code{DATABASE\_URL} points at SQLite in \code{.env} before the CLI tests run,
+for the same reason described in the storage section.
+
+\begin{center}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Suite} & \textbf{Coverage} \\
+\midrule
+\code{src/} (our layer) & 87 \% \\
+Provided \code{ai/} smoke tests & 16/16 passing \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ===============================================================
+\section{Deployment \& Reproducibility}
+
+\subsection{Docker}
+\begin{lstlisting}[style=shell,caption={Full stack, then the keyless offline demo}]
+docker compose up --build         # PostgreSQL + app (API and web page)
+docker compose --profile demo up demo   # offline demo, no keys, no network
+\end{lstlisting}
+
+\code{docker compose up --build} starts PostgreSQL and the application and
+serves the API together with the web page on \url{http://localhost:8000};
+Swagger documentation is at \code{/docs}. The demo profile is the reproducibility
+story for graders without keys: it runs the pipeline end to end against canned
+data.
+
+\subsection{API surface}
+\begin{center}
+\begin{tabular}{@{}llp{7.5cm}@{}}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{What it does} \\
+\midrule
+\code{GET}  & \code{/health}      & health check \\
+\code{POST} & \code{/api/search}  & search, used by the web page \\
+\code{POST} & \code{/ask}         & search with an explicit \code{sources} choice \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[style=shell,caption={Example request}]
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"query": "transformer models", "sources": "wikipedia,arxiv"}'
+\end{lstlisting}
+
+\subsection{Configuration}
+\begin{center}
+\footnotesize
+\begin{longtable}{@{}p{4.3cm}p{1.9cm}p{3.6cm}p{4.6cm}@{}}
+\toprule
+\textbf{Variable} & \textbf{Needed?} & \textbf{Default} & \textbf{What it does} \\
+\midrule
+\endhead
+\code{LLM\_PROVIDER} & yes & \code{gemini} & \code{anthropic}, \code{openai} or \code{gemini} \\
+\code{LLM\_MODEL} & yes & \code{gemini-2.5-flash} & model name \\
+\code{GOOGLE\_API\_KEY} / \code{OPENAI\_API\_KEY} / \code{ANTHROPIC\_API\_KEY} & one, for live runs & --- & key for the chosen LLM; not needed for the offline demo \\
+\code{WEB\_SEARCH\_PROVIDER} & yes & \code{tavily} & \code{tavily}, \code{serper} or \code{duckduckgo} \\
+\code{TAVILY\_API\_KEY} / \code{SERPER\_API\_KEY} & only for that provider & --- & DuckDuckGo needs no key \\
+\code{LOG\_LEVEL} & no & \code{INFO} & \code{DEBUG}, \code{INFO}, \code{WARNING}, \code{ERROR} \\
+\code{CACHE\_DIR} & no & \code{./.cache} & where the file cache lives \\
+\code{CACHE\_TTL\_SECONDS} & no & \code{86400} & how long a cached answer lasts \\
+\code{PER\_SOURCE\_TIMEOUT\_SECONDS} & no & \code{10} & timeout per source \\
+\code{DATABASE\_URL} & no & Postgres container URL & history database; use SQLite locally \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent The same list ships as \code{.env.example}; the real \code{.env} stays
+local and is gitignored.
+
+% ===============================================================
+\section{Limitations \& Future Work}
+\label{sec:limits}
+\begin{itemize}[leftmargin=1.4em,itemsep=3pt]
+  \item The answer carries \code{[N]} markers, but the reference list (title and
+        link) is not yet returned by the API or the CLI. This is the first thing
+        we would finish with another week, since citations without targets are
+        half a feature.
+  \item No authentication and no rate limiting on the API, and every request
+        costs an LLM call --- acceptable for a demo, not for anything exposed.
+  \item CORS is open to all origins for the same reason.
+  \item Two caches, the JSON file cache and the database table, do not share
+        keys, so a hit in one is not a hit in the other.
+  \item Tables are created with \code{create\_all}, so there is no migration
+        tool such as Alembic; a schema change means recreating the database.
+  \item The benchmark table uses simulated baseline values from local environment execution.
+\end{itemize}
+
+% ===============================================================
+\section{Tools \& Acknowledgements}
+The \code{ai/} package was provided by the course and is used as distributed.
+AI coding assistance was used the way any productivity tooling is used --- for
+drafting, boilerplate and first passes at tests --- and the time saved went into
+design, debugging against real provider responses, and verification. Everything
+in the repository was read, run and tested by us.
+
+% ===============================================================
+\begin{thebibliography}{9}
+\addcontentsline{toc}{section}{References}
+\bibitem{gemini} Google Gemini API documentation, \url{https://ai.google.dev/docs}
+\bibitem{tavily} Tavily search API documentation, \url{https://docs.tavily.com}
+\bibitem{wikipedia} Wikipedia Action API (opensearch), \url{https://www.mediawiki.org/wiki/API:Opensearch}
+\bibitem{arxiv} arXiv API user manual, \url{https://info.arxiv.org/help/api/user-manual.html}
+\bibitem{fastapi} FastAPI documentation, \url{https://fastapi.tiangolo.com/}
+\bibitem{httpx} httpx async HTTP client, \url{https://www.python-httpx.org/}
+\bibitem{sqlalchemy} SQLAlchemy documentation, \url{https://docs.sqlalchemy.org/}
+\end{thebibliography}
+
+% ===============================================================
+\appendix
+\section{Appendix --- Reproducing the project}
+
+\begin{lstlisting}[style=shell,caption={From clone to a running answer}]
+git clone https://github.com/Eldar2107/research-assistant.git
+cd research-assistant
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env    # then add your keys
+
+# Offline demo (no keys, no network):
+docker compose --profile demo up demo
+
+# Full test suite with coverage:
+docker compose run --rm -e PYTHONPATH=/app app pytest --cov=src --cov-report=term-missing
+
+# AI smoke tests:
+docker compose run --rm -e PYTHONPATH=/app app pytest tests/test_ai_smoke.py -v
+
+# A single CLI question:
+docker compose run --rm -e PYTHONPATH=/app app python -m src.cli "photosynthesis"
+
+# Two sources only, cache bypassed:
+python -m src.cli "How does CRISPR-Cas9 work?" --sources wiki,arxiv --no-cache
+
+# API and web page outside Docker:
+cd frontend && npm install && npm run build && cd ..
+uvicorn src.api:app --reload --port 8000
+\end{lstlisting}
+
+
+
+\end{document}
